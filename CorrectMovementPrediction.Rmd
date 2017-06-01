@@ -1,0 +1,85 @@
+---
+title: "CorrectMovementPrediction"
+output: html_document
+---
+
+The project goal will be to predict a correct exercise movement using data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. Participants performed one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different ways: "correctly" (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D), throwing the hips to the front (Class E).
+
+Given these data try to predict what class of movement in 20 cases. 
+
+# Obtaining data...
+```{r getdata}
+trainUrl <- 'https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv'
+testUrl <- 'https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv'
+# a first look at the data shows different kinds of NA elements. Change to one. 
+training <- read.csv(url(trainUrl), na.strings=c("NA","#DIV/0!",""))
+testing <- read.csv(url(testUrl), na.strings=c("NA","#DIV/0!",""))
+dim(training); dim(testing)
+```
+
+# Need to prepare data for modeling 
+```{r preparing data}
+library(caret)
+library(rpart)
+library(randomForest)
+
+# remove variables that will not affect classe. Assuming time stamp does not have effect on classe. 
+trainSet <- training[,-(1:7)]
+testSet <- testing[,-(1:7)]
+
+# trainSet has "classe" while testSet has "problem_id" 
+# class(trainSet$classe); class(testSet$problem_id)
+# [1] "factor"
+# [1] "integer"
+testSet$problem_id <- as.factor(testSet$problem_id)
+
+# remove variables with no variation as they are not likely to affect change in classe
+varList <- nearZeroVar(trainSet)
+trainSet <- trainSet[,-varList]
+testSet <- testSet[,-varList]  
+
+# remove variables with high NA content
+NAset <- sapply(trainSet, function(x) mean(is.na(x))) > 0.70
+trainSet <- trainSet[, NAset == FALSE]
+NAset <- sapply(testSet, function(x) mean(is.na(x))) > 0.70
+testSet <- testSet[, NAset == FALSE]
+
+# split training set into training and validation set
+set.seed(123)
+inTrain <- createDataPartition(y=trainSet$classe, p=0.6, list=FALSE)
+trainSettrain <- trainSet[inTrain, ]; validation <- trainSet[-inTrain, ]
+dim(trainSettrain); dim(validation)
+
+```
+
+
+Trying recursive partitioning and regression tree. The "classe" variable in the training set provides the movement class to train on. 
+```{r rpartModel}
+rpartModel <- rpart(classe ~ ., data = trainSettrain, method="class")
+rpartpredict <- predict(rpartModel, newdata = validation, type = "class")
+confusionMatrix(rpartpredict, validation$classe) 
+```
+Accuracy at 0.774
+
+Trying the random forest method
+```{r rfModel}
+rfModel <- randomForest(classe ~. , data= trainSettrain)
+rfpredict <- predict(rfModel, newdata = validation, type = "class")
+confusionMatrix(rfpredict, validation$classe)
+```
+Accuracy at 0.993 giving an out of sample error of 0.007
+
+
+As random forest has higher accuracy let's go with it for predicting the test set
+```{r RFpredict}
+rfTestpredict <- predict(rfModel, newdata = testSet, type = "class")
+rfTestpredict
+```
+
+Out of curiosty, how different does the rpartModel predict?
+```{r rpartPredict}
+rpartTestpredict <- predict(rpartModel, newdata = testSet, type = "class")
+rpartTestpredict
+```
+
+Indeed, there is a difference in just 20 samples. 
