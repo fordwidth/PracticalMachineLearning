@@ -1,0 +1,64 @@
+---
+title: "Plotting_Model_Predictors.Rmd"
+author: "Trent Fowler"
+date: "February 6, 2019"
+output: pdf_document
+---
+Below are a few examples of using plotting and tables to find the stronger predictors in a data set for use in machine learning prediction. This is meant as a resource guide and not as definitive analysis of the R data set Wage. 
+
+```{r, load programs and data}
+library(ISLR)
+library(ggplot2)
+library(caret)
+data(Wage)
+summary(Wage)
+names(Wage)
+```
+
+```{r, assemble training and testing data sets}
+# Get training and test sets
+inTrain <- createDataPartition(y = Wage$wage, p = 0.7, list = FALSE)
+training <- Wage[inTrain,]
+testing <- Wage[-inTrain,]
+dim(training); dim(testing)
+```
+
+```{r, plotout training set}
+# plot out training set
+featurePlot(x = training[, c("age", "education", "jobclass")], 
+            y = training$wage, plot = "pairs")
+#these pair plots are a bit confusing though
+# using ggplot2
+qplot(age, wage, data = training)
+# plotting with color might help resolution of data
+qplot(age, wage, colour = jobclass, data = training)
+# adding regression smoothers might help also 
+qq <- qplot(age, wage, colour = education, data = training)
+qq + geom_smooth(method = "lm", formula = y ~ x)
+
+```
+
+```{r, plot cut wages}
+# cutting data in to different categories when it is clear there is a relationship
+# making factors
+library(Hmisc)
+cutWage <- cut2(training$wage, g = 3)
+table(cutWage)
+# use these factor groups to get another view of the data
+p1 <- qplot(cutWage, age, data = training, fill = cutWage, geom = c("boxplot"))
+p1 
+```
+There is some trend in wages with age, as expected, but in this particular data set age is not a clear cut predictor. 
+
+```{r, view cut data in tables}
+#viewing these cut data in tables may also be useful
+t1 <- table(cutWage, training$jobclass)
+t1
+# prop.table() will give the proportions
+prop.table(t1, 1)
+```
+
+```{r, plot out }
+# lastly density plots with a few factors can illuminate
+qplot(wage, colour = education, data = training, geom = "density")
+```
